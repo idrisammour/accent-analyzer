@@ -1,4 +1,6 @@
 # English Accent Analyzer – Quick Guide for HR
+# VERY IMPORTANT : Change on the code YOUR_OPEN_AI_KEY to yout actual key for it to work
+
 # Purpose
 This tool helps evaluate a people’s spoken English by analyzing their accent and fluency from a short video. 
 
