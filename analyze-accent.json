@@ -1,0 +1,102 @@
+{
+  "nodes": [
+    {
+      "id": "webhook",
+      "name": "Receive Video URL",
+      "type": "n8n-nodes-base.webhook",
+      "position": [200, 300],
+      "parameters": {
+        "path": "analyze-accent",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "downloadVideo",
+      "name": "Download Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [400, 300],
+      "parameters": {
+        "url": "={{ $json[\"body\"][\"videoUrl\"] }}",
+        "responseFormat": "file",
+        "output": "data",
+        "dataPropertyName": "videoFile"
+      }
+    },
+    {
+      "id": "extractAudio",
+      "name": "Extract Audio",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [600, 300],
+      "parameters": {
+        "command": "ffmpeg -i videoFile -vn -ar 16000 -ac 1 -f wav audio.wav"
+      }
+    },
+    {
+      "id": "transcribe",
+      "name": "Transcribe Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [800, 300],
+      "parameters": {
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "method": "POST",
+        "authentication": "none",
+        "sendBinaryData": true,
+        "binaryPropertyName": "audio.wav",
+        "headerParameters": {
+          "Authorization": "Bearer YOUR_OPEN_AI_KEY",
+          "Content-Type": "multipart/form-data"
+        },
+        "bodyParameters": {
+          "model": "whisper-1"
+        }
+      }
+    },
+    {
+      "id": "classifyAccent",
+      "name": "Classify Accent",
+      "type": "n8n-nodes-base.function",
+      "position": [1000, 300],
+      "parameters": {
+        "functionCode": "const text = $json.text || \"\";\nlet accent = \"Uncertain\";\nlet score = 50;\nlet explanation = \"No strong regional indicators.\";\n\nif (text.includes(\"mate\") || text.includes(\"bloody\")) {\n  accent = \"Australian\";\n  score = 75;\n  explanation = \"Aussie slang detected.\";\n} else if (text.includes(\"cheers\") || text.includes(\"flat\")) {\n  accent = \"British\";\n  score = 80;\n  explanation = \"Common British terms used.\";\n} else if (text.includes(\"gotten\") || text.includes(\"apartment\")) {\n  accent = \"American\";\n  score = 85;\n  explanation = \"American phrasing found.\";\n}\n\nreturn [{ accent, confidence: score, explanation, transcript: text }];"
+      }
+    },
+    {
+      "id": "returnResponse",
+      "name": "Return Result",
+      "type": "n8n-nodes-base.set",
+      "position": [1200, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "Accent", "value": "={{ $json[\"accent\"] }}" },
+            { "name": "Confidence", "value": "={{ $json[\"confidence\"] }}" },
+            { "name": "Explanation", "value": "={{ $json[\"explanation\"] }}" },
+            { "name": "Transcript", "value": "={{ $json[\"transcript\"] }}" }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Video URL": {
+      "main": [[{ "node": "Download Video", "type": "main", "index": 0 }]]
+    },
+    "Download Video": {
+      "main": [[{ "node": "Extract Audio", "type": "main", "index": 0 }]]
+    },
+    "Extract Audio": {
+      "main": [[{ "node": "Transcribe Audio", "type": "main", "index": 0 }]]
+    },
+    "Transcribe Audio": {
+      "main": [[{ "node": "Classify Accent", "type": "main", "index": 0 }]]
+    },
+    "Classify Accent": {
+      "main": [[{ "node": "Return Result", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "name": "English Accent Analyzer (with Whisper API)",
+  "tags": []
+}
